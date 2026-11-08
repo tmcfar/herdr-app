@@ -1,0 +1,54 @@
+# Pilot build for tmcfar's WSL trial. Lives only on the `pilot` branch, never on
+# a branch meant for upstream. Same steps as release.yml's build job for
+# windows-x86_64, except the build is NOT marked HERDR_APP_RELEASE: an installed
+# release would update itself from releases.herdr.dev and drop the WSL patch.
+name: pilot-build
+on:
+  push:
+    branches: [pilot]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: pilot-${{ github.ref }}
+  cancel-in-progress: true
+env:
+  RUST_TOOLCHAIN: 1.95.0
+  ZIG_VERSION: 0.16.0
+jobs:
+  windows:
+    runs-on: windows-2022
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: true
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+      - uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
+        with:
+          version: ${{ env.ZIG_VERSION }}
+      - name: Windows build dependencies
+        run: echo "LIBCLANG_PATH=C:\\Program Files\\LLVM\\bin" >> "$GITHUB_ENV"
+      - name: Build as a non-updating pilot
+        run: |
+          sed -i 's/^HERDR_APP_RELEASE=1 cargo build/cargo build/' scripts/package
+          ! grep -q 'HERDR_APP_RELEASE=1' scripts/package
+          scripts/package
+      - name: Checksum
+        run: |
+          cd dist && sha256sum herdr-app-windows-x86_64.tar.gz | tee herdr-app-windows-x86_64.tar.gz.sha256
+          echo "commit ${GITHUB_SHA}" >> herdr-app-windows-x86_64.tar.gz.sha256
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: herdr-app-windows-x86_64-pilot
+          path: |
+            dist/herdr-app-windows-x86_64.tar.gz
+            dist/herdr-app-windows-x86_64.tar.gz.sha256
+          if-no-files-found: error
+          retention-days: 30
