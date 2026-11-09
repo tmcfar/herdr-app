@@ -943,6 +943,10 @@ impl TerminalView {
     }
 
     fn scroll(&mut self, ev: &ScrollWheelEvent, _w: &mut Window, cx: &mut Context<Self>) {
+        // Ctrl (Cmd) + wheel zooms the whole app: leave it to the window, which handles it on the way up.
+        if ev.modifiers.control || ev.modifiers.platform {
+            return;
+        }
         cx.stop_propagation();
         let mut g = self.grid.borrow_mut();
         let steps = scroll_delta_steps(&mut self.scrolled, ev.delta, ev.touch_phase, g.cell, g.vt.cols, g.vt.rows);
