@@ -426,6 +426,8 @@ pub struct AppWindow {
     documents: std::collections::BTreeMap<String, crate::mirror_sync::Slot>,
     initial_view: Option<crate::mirror::View>,
     pointer: Point<Pixels>,
+    /// Ctrl+wheel travel not yet turned into a zoom step (trackpads send many small deltas).
+    zoom_wheel: f32,
     /// Where a press on a `window_drag` node started, until it moves the window.
     drag_from: Option<Point<Pixels>>,
     titlebar_applied: Option<(crate::layout::Titlebar, Option<[f32; 2]>)>,
@@ -516,6 +518,7 @@ impl AppWindow {
             },
             initial_view: std::fs::read_to_string(file("view.json")).ok().and_then(|s| serde_json::from_str(&s).ok()),
             pointer: Point::default(),
+            zoom_wheel: 0.,
             drag_from: None,
             titlebar_applied: None,
             focused_pane: None,
@@ -4732,6 +4735,24 @@ impl Render for AppWindow {
                 }
             }))
             .capture_any_mouse_down(cx.listener(|this, ev: &MouseDownEvent, _, _| this.pointer = ev.position))
+            // Ctrl (Cmd) + wheel: zoom in and out, one step per wheel notch or per 40 px of trackpad travel.
+            // Terminals let it through (see Terminal::scroll); mods' own scroll areas keep plain wheels.
+            .on_scroll_wheel(cx.listener(|this, ev: &ScrollWheelEvent, window, cx| {
+                if !(ev.modifiers.control || ev.modifiers.platform) {
+                    return;
+                }
+                cx.stop_propagation();
+                let dy = match ev.delta {
+                    ScrollDelta::Lines(p) => p.y * 40.,
+                    ScrollDelta::Pixels(p) => p.y / px(1.),
+                };
+                this.zoom_wheel += dy;
+                if this.zoom_wheel.abs() >= 40. {
+                    let name = if this.zoom_wheel > 0. { "app.zoom_in" } else { "app.zoom_out" };
+                    this.zoom_wheel = 0.;
+                    this.dispatch(name, &serde_json::Value::Null, true, window, cx);
+                }
+            }))
             .on_mouse_move(cx.listener(|this, ev: &MouseMoveEvent, window, cx| {
                 this.drag_window(ev, window);
                 if this.drag.is_none() {
