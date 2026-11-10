@@ -261,7 +261,11 @@ impl Render for Setup {
                 .child(button("install", "Install it for me", true).when(!busy, |d| d.on_click(cx.listener(|this, _, w, cx| this.install(w, cx)))))
                 .child(button("choose", "I have it somewhere…", false).when(!busy, |d| d.on_click(cx.listener(|this, _, w, cx| this.choose(w, cx)))))
                 .when(wsl, |d| d.child(button("use-windows", "Use Windows instead", false).when(!busy, |d| d.on_click(cx.listener(|this, _, _, cx| this.use_windows(cx)))))),
-            Need::Connect(_) => div().child(button("retry", "Retry", true).on_click(cx.listener(|this, _, w, cx| this.start(w, cx)))),
+            Need::Connect(_) => div()
+                .flex()
+                .gap(px(10.0))
+                .child(button("retry", "Retry", true).on_click(cx.listener(|this, _, w, cx| this.start(w, cx))))
+                .when(wsl, |d| d.child(button("use-windows", "Use Windows instead", false).when(!busy, |d| d.on_click(cx.listener(|this, _, _, cx| this.use_windows(cx)))))),
             Need::Fix(Mismatch::Newer { .. }) => div()
                 .flex()
                 .gap(px(10.0))
